@@ -1,9 +1,17 @@
-import MapExample from "./components/MapExample";
+import DemandForm from "./components/Forms/DemandForm";
+import MapProvider from "./components/Map/MapProvider";
+import MapSelector from "./components/Map/MapSelector";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <MapExample></MapExample>
+    <div className="flex items-center justify-center min-h-screen">
+      <div>
+        <MapProvider>
+          <MapSelector />
+        </MapProvider>
+
+        <DemandForm></DemandForm>
+      </div>
     </div>
   );
 }
