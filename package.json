@@ -12,12 +12,16 @@
     "@gravity-ui/icons": "^2.17.0",
     "@heroui/react": "^3.0.0-beta.5",
     "@heroui/styles": "^3.0.0-beta.5",
+    "@hookform/resolvers": "^5.2.2",
     "@react-google-maps/api": "^2.20.8",
+    "@vis.gl/react-google-maps": "^1.7.1",
+    "antd": "^6.2.3",
     "mapbox-gl": "^3.18.1",
     "next": "16.1.6",
     "patch-package": "^8.0.1",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-hook-form": "^7.71.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

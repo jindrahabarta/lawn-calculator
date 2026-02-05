@@ -6,7 +6,7 @@ const MapProvider = ({ children }: { children: React.JSX.Element }) => {
   return (
     <LoadScript
       googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}
-      libraries={["places"]}
+      libraries={["places", "geometry"]}
     >
       {children}
     </LoadScript>

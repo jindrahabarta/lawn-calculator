@@ -1,18 +1,16 @@
 "use client";
-import {
-  GoogleMap,
-  Marker,
-  Polygon,
-  PolygonProps,
-  Polyline,
-} from "@react-google-maps/api";
-import { useMemo, useRef, useState } from "react";
-import { Input, Button } from "@heroui/react";
-import { ArrowRotateRight, Check } from "@gravity-ui/icons";
+import { GoogleMap, Marker, Polygon, Polyline } from "@react-google-maps/api";
+import { useRef, useState } from "react";
+import { Button } from "@heroui/react";
+import { ArrowRotateRight } from "@gravity-ui/icons";
+import SearchBar from "./SearchBar";
+import { PolygonData } from "@/app/types/polygonData";
+import { getLabel } from "@/app/utils/getLabel";
+import { getColor } from "@/app/utils/getColor";
 
 const containerStyle = {
   width: "100%",
-  height: "400px",
+  height: "100%",
 };
 
 const defaultCenter = {
@@ -22,7 +20,7 @@ const defaultCenter = {
 
 export default function Map() {
   //Polygon selector
-  const [polygons, setPolygons] = useState<PolygonProps[]>([]);
+  const [polygons, setPolygons] = useState<PolygonData[]>([]);
   const [currentPath, setCurrentPath] = useState<
     [] | { lat: number; lng: number }[]
   >([]);
@@ -30,6 +28,8 @@ export default function Map() {
     lat: number;
     lng: number;
   }>(null);
+
+  const polygonRefs = useRef<Record<string, google.maps.Polygon>>({});
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (!e.latLng) return;
@@ -58,80 +58,70 @@ export default function Map() {
   const closePolygon = () => {
     if (currentPath.length < 3) return;
 
-    setPolygons((prev) => [...prev, currentPath]);
+    const index = polygons.length;
+
+    const newPolygon: PolygonData = {
+      id: getLabel(index),
+      color: getColor(index),
+      path: currentPath,
+    };
+
+    setPolygons((prev) => [...prev, newPolygon]);
     setCurrentPath([]); // reset → nový polygon
     setPreviewPoint(null);
   };
 
   const computeArea = (path: { lat: number; lng: number }[]) => {
-    if (path.length < 3) return 0;
+    if (!window.google || path.length < 3) return 0;
+
     const googlePath = path.map(
       (p) => new window.google.maps.LatLng(p.lat, p.lng),
     );
+
     return window.google.maps.geometry.spherical.computeArea(googlePath);
   };
 
-  const totalArea = useMemo(() => {
-    return polygons.reduce((sum, poly) => sum + computeArea(poly), 0);
-  }, [polygons]);
+  const totalArea = () => {
+    return polygons.reduce((sum, p) => sum + computeArea(p.path), 0);
+  };
+
+  const reset = () => {
+    setPolygons([]);
+    setCurrentPath([]);
+    setPreviewPoint(null);
+  };
+
+  //Update polygonu
+  //TODO: nefunguje update
+  const handlePolygonLoad = (polygon: google.maps.Polygon, id: string) => {
+    const path = polygon.getPath();
+    console.log("UPDATED", id);
+    const updatePolygon = () => {
+      const newPath = path.getArray().map((latLng) => ({
+        lat: latLng.lat(),
+        lng: latLng.lng(),
+      }));
+
+      setPolygons((prev) =>
+        prev.map((poly) =>
+          poly.id === id ? { ...poly, path: newPath } : poly,
+        ),
+      );
+    };
+
+    path.addListener("set_at", updatePolygon);
+    path.addListener("insert_at", updatePolygon);
+    path.addListener("remove_at", updatePolygon);
+  };
 
   //Search bar
   const [center, setCenter] = useState(defaultCenter);
-  const mapRef = useRef<null | google.maps.Map>(null);
-  const inputRef = useRef<null | HTMLInputElement>(null);
-
-  const handleLoad = (map: google.maps.Map) => {
-    if (!inputRef.current) return;
-
-    mapRef.current = map;
-
-    // Inicializace autocomplete
-    const autocomplete = new window.google.maps.places.Autocomplete(
-      inputRef.current,
-      {
-        types: ["geocode"], // jen adresy
-      },
-    );
-
-    autocomplete.addListener("place_changed", () => {
-      const place = autocomplete.getPlace();
-
-      if (!place.geometry?.location) return;
-
-      const newCenter = {
-        lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng(),
-      };
-      setCenter(newCenter);
-
-      if (!mapRef.current) return;
-      // posun mapy na novou lokaci
-      mapRef.current.panTo(newCenter);
-      mapRef.current.setZoom(18);
-    });
-  };
+  const onMapLoad = (map: google.maps.Map) => {};
 
   return (
     <div>
-      <div>1. Zadejte adresu</div>
-      <div>2. Vyberte plochu o kterou se jedná</div>
-      <div>3. Zadejte kontaktní údaje</div>
-
-      <div className="relative w-2xl aspect-video rounded-2xl overflow-hidden ">
-        <Input
-          aria-label="Area"
-          className="w-1/2 absolute top-2 left-2 z-10 bg-white/80 opacity-80 focus:opacity-100 hover:opacity-100 duration-200"
-          ref={inputRef}
-          placeholder="Zadejte adresu..."
-        />
-
-        <Button
-          className="absolute bottom-2 right-2 z-10"
-          onClick={() => {
-            setPolygons([]);
-            setCurrentPath([]);
-          }}
-        >
+      <div className="mt-4 relative aspect-video rounded-2xl overflow-hidden w-full">
+        <Button className="absolute bottom-2 right-2 z-10" onClick={reset}>
           <ArrowRotateRight />
           Resetovat výběr
         </Button>
@@ -154,23 +144,29 @@ export default function Map() {
           }}
           onMouseMove={handleMouseMove}
           onClick={handleMapClick}
-          onLoad={handleLoad}
+          onLoad={onMapLoad}
         >
+          <SearchBar
+            getCenter={(center) => setCenter(center)}
+            handleLoad={onMapLoad}
+          ></SearchBar>
           <Marker position={center} clickable={false} />
 
           {/* HOTOVÉ POLYGONY */}
-          {polygons.map((path, i) => (
+          {polygons.map((polygon) => (
             <Polygon
-              key={i}
-              path={path}
+              key={polygon.id}
+              path={polygon.path}
               options={{
-                fillColor: "#16a34a",
+                fillColor: polygon.color,
                 fillOpacity: 0.3,
-                strokeColor: "#16a34a",
+                strokeColor: polygon.color,
                 strokeWeight: 2,
                 clickable: false,
+                editable: true,
               }}
               editable
+              onLoad={(poly) => handlePolygonLoad(poly, polygon.id)}
               // TODO: po editu aktualizovat vybraný polygon
             />
           ))}
@@ -181,7 +177,7 @@ export default function Map() {
               <Polyline
                 path={currentPath}
                 options={{
-                  strokeColor: "#4f46e5",
+                  strokeColor: "#FBEF76",
                   strokeWeight: 2,
                 }}
               />
@@ -199,7 +195,7 @@ export default function Map() {
             <Polyline
               path={[currentPath[currentPath.length - 1], previewPoint]}
               options={{
-                strokeColor: "#4f46e5",
+                strokeColor: "#FBEF76",
                 strokeOpacity: 0.7,
                 strokeWeight: 2,
                 editable: false,
@@ -210,13 +206,41 @@ export default function Map() {
         </GoogleMap>
       </div>
 
+      <div className="mt-4 grid gap-2 grid-cols-2">
+        {polygons.map((poly) => (
+          <div
+            key={poly.id}
+            className="rounded-lg p-2 font-medium flex justify-between items-center"
+            style={{ backgroundColor: poly.color }}
+          >
+            <span>
+              Plocha {poly.id} - {computeArea(poly.path).toFixed(2)} m²
+            </span>
+
+            <button
+              onClick={() => {
+                setPolygons((prev) => {
+                  const filtered = prev.filter(
+                    (polygon) => polygon.id !== poly.id,
+                  );
+
+                  return filtered.map((polygon, index) => ({
+                    ...polygon,
+                    id: getLabel(index),
+                    color: getColor(index),
+                  }));
+                });
+              }}
+              className="aspect-square h-auto w-8 border border-black rounded-md flex items-center justify-center cursor-pointer"
+            >
+              x
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div style={{ marginTop: 10 }}>
-        <strong>Vybrané oblasti:</strong> {polygons.length} <br />
-        <strong>Celková plocha:</strong> {totalArea.toFixed(2)} m² <br />
-        <Button className="bg-green-400 mt-4">
-          <Check />
-          Potvrdit výběr
-        </Button>
+        <strong>Celková plocha:</strong> {totalArea().toFixed(2)} m² <br />
       </div>
     </div>
   );
