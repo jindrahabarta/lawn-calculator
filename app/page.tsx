@@ -24,7 +24,7 @@ export default function Home() {
       <div className="mt-4 w-1/2 bg-gray-50 border border-black/10 rounded-3xl p-6 pt-4">
         {step === 0 && (
           <MapProvider>
-            <MapSelector />
+            <MapSelector getTotalArea={(area: number) => setTotalArea(area)} />
           </MapProvider>
         )}
 

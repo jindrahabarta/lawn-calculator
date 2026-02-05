@@ -1,6 +1,6 @@
 "use client";
 import { GoogleMap, Marker, Polygon, Polyline } from "@react-google-maps/api";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@heroui/react";
 import { ArrowRotateRight } from "@gravity-ui/icons";
 import SearchBar from "./SearchBar";
@@ -18,7 +18,11 @@ const defaultCenter = {
   lng: 14.4378,
 };
 
-export default function Map() {
+export default function Map({
+  getTotalArea,
+}: {
+  getTotalArea: (a: number) => void;
+}) {
   //Polygon selector
   const [polygons, setPolygons] = useState<PolygonData[]>([]);
   const [currentPath, setCurrentPath] = useState<
@@ -28,8 +32,6 @@ export default function Map() {
     lat: number;
     lng: number;
   }>(null);
-
-  const polygonRefs = useRef<Record<string, google.maps.Polygon>>({});
 
   const handleMapClick = (e: google.maps.MapMouseEvent) => {
     if (!e.latLng) return;
@@ -84,6 +86,8 @@ export default function Map() {
   const totalArea = () => {
     return polygons.reduce((sum, p) => sum + computeArea(p.path), 0);
   };
+
+  getTotalArea(totalArea());
 
   const reset = () => {
     setPolygons([]);
